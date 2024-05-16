@@ -6,15 +6,20 @@ type Course = record {
   body : text;
   creator_address : text;
   created_at : nat64;
+  keyword : text;
   attachment_url : text;
 };
 type CoursePayLoad = record {
   title : text;
   creator_name : text;
   body : text;
+  keyword : text;
   attachment_url : text;
 };
-type Error = variant { NotFound : record { msg : text } };
+type Error = variant {
+  NotFound : record { msg : text };
+  Unauthorized : record { msg : text };
+};
 type Result = variant { Ok : Course; Err : Error };
 service : {
   add_message : (CoursePayLoad) -> (opt Course);

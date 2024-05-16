@@ -10,6 +10,13 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
+
+enum Category {
+    Programming,
+    Health,
+    LifeStyle,
+}
+
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Course {
     id: u64,
@@ -18,6 +25,7 @@ struct Course {
     title: String,
     body: String,
     attachment_url: String,
+    keyword: String,
     created_at: u64,
     updated_at: Option<u64>,
 }
@@ -61,6 +69,7 @@ struct CoursePayLoad {
     creator_name: String,
     body: String,
     attachment_url: String,
+    keyword: String,
 }
 
 #[ic_cdk::query]
@@ -92,7 +101,9 @@ fn add_message(message: CoursePayLoad) -> Option<Course> {
         attachment_url: message.attachment_url,
         created_at: time(),
         updated_at: None,
+        keyword: message.keyword
     };
+
     do_insert(&message);
     Some(message)
 }
@@ -101,12 +112,22 @@ fn add_message(message: CoursePayLoad) -> Option<Course> {
 fn update_message(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut message) => {
-            message.attachment_url = payload.attachment_url;
-            message.body = payload.body;
-            message.title = payload.title;
-            message.updated_at = Some(time());
-            do_insert(&message);
-            Ok(message)
+            let caller = api::caller();
+            if message.creator_address != caller.to_string() {
+                Err(Error::Unauthorized {
+                    msg: format!(
+                        "you are not the creator of id={}",
+                        id
+                    ),
+                })
+            } else {
+                message.attachment_url = payload.attachment_url;
+                message.body = payload.body;
+                message.title = payload.title;
+                message.updated_at = Some(time());
+                do_insert(&message);
+                Ok(message)
+            }
         }
         None => Err(Error::NotFound {
             msg: format!(
@@ -138,6 +159,7 @@ fn delete_message(id: u64) -> Result<Course, Error> {
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
     NotFound { msg: String },
+    Unauthorized { msg: String }
 }
 
 // a helper method to get a message by id. used in get_message/update_message
