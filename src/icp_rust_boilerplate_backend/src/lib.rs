@@ -106,6 +106,7 @@ fn _get_message(id: &u64) -> Option<Message> {
     STORAGE.with(|s| s.borrow().get(id))
 }
 
+// Returns whether the message was inserted or not -> could have used Result
 #[ic_cdk::update]
 fn add_message(message: MessagePayload) -> Option<Message> {
 
