@@ -26,6 +26,7 @@ struct Course {
     body: String,
     attachment_url: String,
     keyword: String,
+    category: String,
     created_at: u64,
     updated_at: Option<u64>,
 }
@@ -70,20 +71,41 @@ struct CoursePayLoad {
     body: String,
     attachment_url: String,
     keyword: String,
+    category: String
 }
 
 #[ic_cdk::query]
-fn get_message(id: u64) -> Result<Course, Error> {
-    match _get_message(&id) {
-        Some(message) => Ok(message),
+fn get_course(id: u64) -> Result<Course, Error> {
+    match _get_course_(&id) {
+        Some(course) => Ok(course),
         None => Err(Error::NotFound {
-            msg: format!("a message with id={} not found", id),
+            msg: format!("a course with id={} not found", id),
         }),
     }
 }
 
+// // Function to filter courses by creator address
+// fn find_courses_by_creator_address(creator_address: &str) -> Vec<&Course> {
+//     courses
+//         .iter()
+//         .filter(|course| course.creator_address == creator_address)
+//         .collect()
+// }
+
 #[ic_cdk::update]
-fn add_message(message: CoursePayLoad) -> Option<Course> {
+fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
+    //Validation Logic
+    if course.title.is_empty()
+    || course.creator_name.is_empty()
+    || course.body.is_empty()
+    || course.attachment_url.is_empty()
+    || course.keyword.is_empty()
+    || course.category.is_empty()
+    {
+        return Err(Error::EmptyFields {
+            msg: "Please fill in all the required fields to create a course".to_string(),
+        });
+    }
     let id = ID_COUNTER
         .with(|counter| {
             let current_value = *counter.borrow().get();
@@ -91,47 +113,60 @@ fn add_message(message: CoursePayLoad) -> Option<Course> {
         })
         .expect("cannot increment id counter");
 
-    let puffy: String = api::caller().to_string();
-    let message = Course {
+    let address_string: String = api::caller().to_string();
+    let course = Course {
         id,
-        creator_address: puffy,
-        creator_name: message.creator_name,
-        title: message.title,
-        body: message.body,
-        attachment_url: message.attachment_url,
+        creator_address: address_string,
+        creator_name: course.creator_name,
+        title: course.title,
+        body: course.body,
+        attachment_url: course.attachment_url,
         created_at: time(),
         updated_at: None,
-        keyword: message.keyword
+        category: course.category,
+        keyword: course.keyword
     };
 
-    do_insert(&message);
-    Some(message)
+    do_insert(&course);
+    Ok(course)
 }
 
 #[ic_cdk::update]
-fn update_message(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
+fn update_course(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
+    //Validation Logic
+    if payload.title.is_empty()
+    || payload.creator_name.is_empty()
+    || payload.body.is_empty()
+    || payload.attachment_url.is_empty()
+    || payload.keyword.is_empty()
+    || payload.category.is_empty()
+    {
+        return Err(Error::EmptyFields {
+            msg: "Please fill in all the required fields to create a course".to_string(),
+        });
+    }
     match STORAGE.with(|service| service.borrow().get(&id)) {
-        Some(mut message) => {
+        Some(mut course) => {
             let caller = api::caller();
-            if message.creator_address != caller.to_string() {
-                Err(Error::Unauthorized {
+            if course.creator_address != caller.to_string() {
+                Err(Error::UnAuthorized {
                     msg: format!(
                         "you are not the creator of id={}",
                         id
                     ),
                 })
             } else {
-                message.attachment_url = payload.attachment_url;
-                message.body = payload.body;
-                message.title = payload.title;
-                message.updated_at = Some(time());
-                do_insert(&message);
-                Ok(message)
+                course.attachment_url = payload.attachment_url;
+                course.body = payload.body;
+                course.title = payload.title;
+                course.updated_at = Some(time());
+                do_insert(&course);
+                Ok(course)
             }
         }
         None => Err(Error::NotFound {
             msg: format!(
-                "couldn't update a message with id={}. message not found",
+                "couldn't update a course with id={}. course not found",
                 id
             ),
         }),
@@ -139,17 +174,17 @@ fn update_message(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
 }
 
 // helper method to perform insert.
-fn do_insert(message: &Course) {
-    STORAGE.with(|service| service.borrow_mut().insert(message.id, message.clone()));
+fn do_insert(course: &Course) {
+    STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
 }
 
 #[ic_cdk::update]
-fn delete_message(id: u64) -> Result<Course, Error> {
+fn delete_course(id: u64) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow_mut().remove(&id)) {
-        Some(message) => Ok(message),
+        Some(course) => Ok(course),
         None => Err(Error::NotFound {
             msg: format!(
-                "couldn't delete a message with id={}. message not found.",
+                "couldn't delete a course with id={}. course not found.",
                 id
             ),
         }),
@@ -159,11 +194,11 @@ fn delete_message(id: u64) -> Result<Course, Error> {
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
     NotFound { msg: String },
-    Unauthorized { msg: String }
+    UnAuthorized { msg: String },
+    EmptyFields {msg: String}
 }
 
-// a helper method to get a message by id. used in get_message/update_message
-fn _get_message(id: &u64) -> Option<Course> {
+fn _get_course_(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
 }
 
