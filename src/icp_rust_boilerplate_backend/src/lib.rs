@@ -189,11 +189,25 @@ fn do_insert(course: &Course) {
 
 #[ic_cdk::update]
 fn delete_course(id: u64) -> Result<Course, Error> {
-    match STORAGE.with(|service| service.borrow_mut().remove(&id)) {
-        Some(course) => Ok(course),
+    match STORAGE.with(|service| service.borrow().get(&id)) {
+        Some(course) => {
+            let caller = api::caller();
+            if course.creator_address != caller.to_string() {
+                Err(Error::UnAuthorized {
+                    msg: format!(
+                        "you are not the creator of the course id={}",
+                        id
+                    ),
+                })
+            } else {
+                STORAGE.with(|service| service.borrow_mut().remove(&id));
+                Ok(course)
+            }
+        }
+
         None => Err(Error::NotFound {
             msg: format!(
-                "couldn't delete a course with id={}. course not found.",
+                "couldn't delete course with id={}. course not found.",
                 id
             ),
         }),
