@@ -1,22 +1,24 @@
-type Error = variant { NotFound : record { msg : text } };
-type Message = record {
+type Course = record {
   id : nat64;
   title : text;
   updated_at : opt nat64;
+  creator_name : text;
   body : text;
   creator_address : text;
   created_at : nat64;
   attachment_url : text;
 };
-type MessagePayload = record {
+type CoursePayLoad = record {
   title : text;
+  creator_name : text;
   body : text;
   attachment_url : text;
 };
-type Result = variant { Ok : Message; Err : Error };
+type Error = variant { NotFound : record { msg : text } };
+type Result = variant { Ok : Course; Err : Error };
 service : {
-  add_message : (MessagePayload) -> (opt Message);
+  add_message : (CoursePayLoad) -> (opt Course);
   delete_message : (nat64) -> (Result);
   get_message : (nat64) -> (Result) query;
-  update_message : (nat64, MessagePayload) -> (Result);
+  update_message : (nat64, CoursePayLoad) -> (Result);
 }

@@ -11,8 +11,9 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
-struct Message {
+struct Course {
     id: u64,
+    creator_name: String,
     creator_address: String,
     title: String,
     body: String,
@@ -22,7 +23,7 @@ struct Message {
 }
 
 // a trait that must be implemented for a struct that is stored in a stable struct
-impl Storable for Message {
+impl Storable for Course {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
@@ -33,7 +34,7 @@ impl Storable for Message {
 }
 
 // another trait that must be implemented for a struct that is stored in a stable struct
-impl BoundedStorable for Message {
+impl BoundedStorable for Course {
     const MAX_SIZE: u32 = 1024;
     const IS_FIXED_SIZE: bool = false;
 }
@@ -48,21 +49,22 @@ thread_local! {
             .expect("Cannot create a counter")
     );
 
-    static STORAGE: RefCell<StableBTreeMap<u64, Message, Memory>> =
+    static STORAGE: RefCell<StableBTreeMap<u64, Course, Memory>> =
         RefCell::new(StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
     ));
 }
 
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
-struct MessagePayload {
+struct CoursePayLoad {
     title: String,
+    creator_name: String,
     body: String,
     attachment_url: String,
 }
 
 #[ic_cdk::query]
-fn get_message(id: u64) -> Result<Message, Error> {
+fn get_message(id: u64) -> Result<Course, Error> {
     match _get_message(&id) {
         Some(message) => Ok(message),
         None => Err(Error::NotFound {
@@ -72,7 +74,7 @@ fn get_message(id: u64) -> Result<Message, Error> {
 }
 
 #[ic_cdk::update]
-fn add_message(message: MessagePayload) -> Option<Message> {
+fn add_message(message: CoursePayLoad) -> Option<Course> {
     let id = ID_COUNTER
         .with(|counter| {
             let current_value = *counter.borrow().get();
@@ -81,9 +83,10 @@ fn add_message(message: MessagePayload) -> Option<Message> {
         .expect("cannot increment id counter");
 
     let puffy: String = api::caller().to_string();
-    let message = Message {
+    let message = Course {
         id,
         creator_address: puffy,
+        creator_name: message.creator_name,
         title: message.title,
         body: message.body,
         attachment_url: message.attachment_url,
@@ -95,7 +98,7 @@ fn add_message(message: MessagePayload) -> Option<Message> {
 }
 
 #[ic_cdk::update]
-fn update_message(id: u64, payload: MessagePayload) -> Result<Message, Error> {
+fn update_message(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut message) => {
             message.attachment_url = payload.attachment_url;
@@ -115,12 +118,12 @@ fn update_message(id: u64, payload: MessagePayload) -> Result<Message, Error> {
 }
 
 // helper method to perform insert.
-fn do_insert(message: &Message) {
+fn do_insert(message: &Course) {
     STORAGE.with(|service| service.borrow_mut().insert(message.id, message.clone()));
 }
 
 #[ic_cdk::update]
-fn delete_message(id: u64) -> Result<Message, Error> {
+fn delete_message(id: u64) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow_mut().remove(&id)) {
         Some(message) => Ok(message),
         None => Err(Error::NotFound {
@@ -138,7 +141,7 @@ enum Error {
 }
 
 // a helper method to get a message by id. used in get_message/update_message
-fn _get_message(id: &u64) -> Option<Message> {
+fn _get_message(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
 }
 
