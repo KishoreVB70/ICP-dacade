@@ -29,6 +29,7 @@ struct Course {
     category: String,
     created_at: u64,
     updated_at: Option<u64>,
+    contact: String,
 }
 
 // a trait that must be implemented for a struct that is stored in a stable struct
@@ -71,7 +72,8 @@ struct CoursePayLoad {
     body: String,
     attachment_url: String,
     keyword: String,
-    category: String
+    category: String,
+    contact: String
 }
 
 #[ic_cdk::query]
@@ -101,6 +103,7 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
     || course.attachment_url.is_empty()
     || course.keyword.is_empty()
     || course.category.is_empty()
+    || course.contact.is_empty()
     {
         return Err(Error::EmptyFields {
             msg: "Please fill in all the required fields to create a course".to_string(),
@@ -124,7 +127,8 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
         created_at: time(),
         updated_at: None,
         category: course.category,
-        keyword: course.keyword
+        keyword: course.keyword,
+        contact: course.contact
     };
 
     do_insert(&course);
@@ -133,18 +137,19 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
 
 #[ic_cdk::update]
 fn update_course(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
-    //Validation Logic
-    if payload.title.is_empty()
-    || payload.creator_name.is_empty()
-    || payload.body.is_empty()
-    || payload.attachment_url.is_empty()
-    || payload.keyword.is_empty()
-    || payload.category.is_empty()
-    {
-        return Err(Error::EmptyFields {
-            msg: "Please fill in all the required fields to create a course".to_string(),
-        });
-    }
+    // //Validation Logic
+    // if payload.title.is_empty()
+    // || payload.creator_name.is_empty()
+    // || payload.body.is_empty()
+    // || payload.attachment_url.is_empty()
+    // || payload.keyword.is_empty()
+    // || payload.category.is_empty()
+    // || payload.contact.is_empty()
+    // {
+    //     return Err(Error::EmptyFields {
+    //         msg: "Please fill in all the required fields to create a course".to_string(),
+    //     });
+    // }
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut course) => {
             let caller = api::caller();
@@ -156,9 +161,13 @@ fn update_course(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
                     ),
                 })
             } else {
-                course.attachment_url = payload.attachment_url;
-                course.body = payload.body;
                 course.title = payload.title;
+                course.creator_name = payload.creator_name;
+                course.body = payload.body;
+                course.attachment_url = payload.attachment_url;
+                course.keyword = payload.keyword;
+                course.category = payload.category;
+                course.contact = payload.contact;
                 course.updated_at = Some(time());
                 do_insert(&course);
                 Ok(course)

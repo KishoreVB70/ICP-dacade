@@ -2,6 +2,7 @@ type Course = record {
   id : nat64;
   title : text;
   updated_at : opt nat64;
+  contact : text;
   creator_name : text;
   body : text;
   creator_address : text;
@@ -12,6 +13,7 @@ type Course = record {
 };
 type CoursePayLoad = record {
   title : text;
+  contact : text;
   creator_name : text;
   body : text;
   category : text;
