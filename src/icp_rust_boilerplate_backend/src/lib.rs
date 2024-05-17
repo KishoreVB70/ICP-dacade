@@ -596,6 +596,49 @@ fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     }
 }
 
+#[ic_cdk::update]
+fn un_ban_creator(address: String) -> Result<(), Error> {
+    // The caller must be admin or moderator
+    let caller = api::caller().to_string(); // Convert caller address to string
+    // Check if the caller is an admin or moderator and the provided address is not the admin or moderator
+    let is_authorized = {
+        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+            admin_address.lock().unwrap().clone()
+        });
+        if let Some(admin) = &admin_address {
+            if caller == *admin {
+                true
+            } else {
+                // Check if the caller is one of the moderators
+                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                    moderator_addresses.lock().unwrap().clone()
+                });
+                moderators.contains(&caller.to_string())
+            }
+        } else {
+            false
+        }
+    };
+
+    if is_authorized {
+        BANNED_ADDRESSES.with(|banned_addresses| {
+            let mut addresses = banned_addresses.lock().unwrap();
+            if let Some(pos) = addresses.iter().position(|x| *x == address) {
+                addresses.remove(pos);
+                Ok(())
+            } else {
+                Err(Error::NotFound {
+                    msg: "Address not found in banned list.".to_string(),
+                })
+            }
+        })
+    } else {
+        Err(Error::UnAuthorized {
+            msg: ("You are not authorized to ban the user".to_string()),
+        })
+    }
+}
+
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
     NotFound { msg: String },
