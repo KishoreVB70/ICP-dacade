@@ -43,6 +43,7 @@ type Result = variant { Ok : Course; Err : Error };
 type Result_1 = variant { Ok : vec Course; Err : Error };
 service : {
   add_course : (CoursePayLoad) -> (Result);
+  delete_all_courses : () -> (Result_1);
   delete_course : (nat64) -> (Result);
   filter_courses_and : (FilterPayLoad) -> (Result_1) query;
   filter_courses_or : (FilterPayLoad) -> (Result_1) query;

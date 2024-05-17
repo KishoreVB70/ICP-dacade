@@ -104,6 +104,10 @@ fn get_course(id: u64) -> Result<Course, Error> {
     }
 }
 
+// Internal function
+fn _get_course_(id: &u64) -> Option<Course> {
+    STORAGE.with(|service| service.borrow().get(id))
+}
 
 #[ic_cdk::query]
 fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
@@ -145,7 +149,7 @@ fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     let courses: Vec<Course> = STORAGE.with(|storage| {
         storage.borrow().iter()
             .filter_map(|(_, course)| {
-                let mut matches = false; // Initialize with false for OR operation
+                let mut matches = false;
                 if let Some(ref keyword) = payload.keyword {
                     matches |= course.keyword == *keyword; 
                 }
@@ -175,9 +179,6 @@ fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     }
 }
 
-fn _get_course_(id: &u64) -> Option<Course> {
-    STORAGE.with(|service| service.borrow().get(id))
-}
 
 #[ic_cdk::update]
 fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
@@ -298,6 +299,40 @@ fn delete_course(id: u64) -> Result<Course, Error> {
         }),
     }
 }
+
+#[ic_cdk::update]
+fn delete_all_courses() -> Result<Vec<Course>, Error> {
+    let caller = api::caller().to_string(); // Convert caller address to string
+    let mut deleted_courses: Vec<Course> = Vec::new(); // Keep track of deleted courses
+
+    STORAGE.with(|service| {
+        let mut storage = service.borrow_mut();
+        let mut keys_to_remove = Vec::new(); // Keep track of keys to remove
+
+        // Iterate through storage to find and remove matching courses
+        for (id, course) in storage.iter() {
+            if course.creator_address == caller {
+                // If creator address matches caller, mark for removal
+                keys_to_remove.push(id.clone());
+                deleted_courses.push(course.clone()); // Add course to deleted list
+            }
+        }
+
+        // Remove courses from storage
+        for key in keys_to_remove {
+            storage.remove(&key);
+        }
+    });
+
+    if deleted_courses.is_empty() {
+        Err(Error::NotFound {
+            msg: "No courses found for the caller. Nothing to delete.".to_string(),
+        })
+    } else {
+        Ok(deleted_courses)
+    }
+}
+
 
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
