@@ -425,6 +425,65 @@ fn delete_course(id: u64) -> Result<Course, Error> {
 }
 
 #[ic_cdk::update]
+fn delete_courses_by_creator(address: String) -> Result<Vec<Course>, Error> {
+    let caller = api::caller().to_string(); // Convert caller address to string
+    let is_allowed = {
+        // Check if the caller is the input address
+        if address == caller.to_string() {
+            true
+        } else {
+            // Check if the caller is the admin
+            let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+                admin_address.lock().unwrap().clone()
+            });
+            if let Some(admin) = &admin_address {
+                if caller == *admin {
+                    true
+                } else {
+                    // Check if the caller is one of the moderators
+                    let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                        moderator_addresses.lock().unwrap().clone()
+                    });
+                    moderators.contains(&caller.to_string())
+                }
+            } else {
+                false
+            }
+        }
+    };
+    if is_allowed {
+        let mut deleted_courses: Vec<Course> = Vec::new(); // Keep track of deleted courses
+        STORAGE.with(|service| {
+            let mut storage = service.borrow_mut();
+            let mut keys_to_remove = Vec::new(); // Keep track of keys to remove
+            // Iterate through storage to find and remove matching courses
+            for (id, course) in storage.iter() {
+                if course.creator_address == address {
+                    // If creator address matches caller, mark for removal
+                    keys_to_remove.push(id.clone());
+                    deleted_courses.push(course.clone()); // Add course to deleted list
+                }
+            }
+            // Remove courses from storage
+            for key in keys_to_remove {
+                storage.remove(&key);
+            }
+        });
+        if deleted_courses.is_empty() {
+            Err(Error::NotFound {
+                msg: "No courses found for the caller. Nothing to delete.".to_string(),
+            })
+        } else {
+            Ok(deleted_courses)
+        }
+    } else {
+        Err(Error::UnAuthorized {
+            msg: ("You are not authorized to delete the course ".to_string()),
+        })
+    }
+}
+
+#[ic_cdk::update]
 fn delete_my_courses() -> Result<Vec<Course>, Error> {
     let caller = api::caller().to_string(); // Convert caller address to string
     let mut deleted_courses: Vec<Course> = Vec::new(); // Keep track of deleted courses

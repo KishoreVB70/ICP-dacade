@@ -46,6 +46,7 @@ service : {
   add_course : (CoursePayLoad) -> (Result);
   add_moderator_address : (text) -> (Result_1);
   delete_course : (nat64) -> (Result);
+  delete_courses_by_creator : (text) -> (Result_2);
   delete_my_courses : () -> (Result_2);
   filter_courses_and : (FilterPayLoad) -> (Result_2) query;
   filter_courses_or : (FilterPayLoad) -> (Result_2) query;
