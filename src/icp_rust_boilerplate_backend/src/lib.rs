@@ -103,13 +103,27 @@ struct FilterPayLoad {
     creator_address: Option<String>,
 }
 
+// Small confusion in what the admin address is not set is doing
 #[ic_cdk::update]
-fn set_admin_address(address: String) {
+fn set_admin_address(address: String) -> Result<(), String> {
     ADMIN_ADDRESS.with(|admin_address| {
-        *admin_address.lock().unwrap() = Some(address);
-    });
+        let caller = api::caller().to_string();
+        let mut admin_address = admin_address.lock().unwrap();
+        if admin_address.is_none() {
+            *admin_address = Some(address);
+            Ok(())
+        } else if let Some(admin) = &*admin_address {
+            if caller == *admin {
+                *admin_address = Some(address);
+                Ok(())
+            } else {
+                Err("Only admin can change the admin address".to_string())
+            }
+        } else {
+            Err("Admin address is not set".to_string())
+        }
+    })
 }
-
 
 #[ic_cdk::update]
 fn add_moderator_address(address: String) -> Result<(), String> {
