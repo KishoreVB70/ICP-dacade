@@ -20,6 +20,15 @@ type CoursePayLoad = record {
   keyword : text;
   attachment_url : text;
 };
+type CourseUpdatePayLoad = record {
+  title : opt text;
+  contact : opt text;
+  creator_name : opt text;
+  body : opt text;
+  category : opt text;
+  keyword : opt text;
+  attachment_url : opt text;
+};
 type Error = variant {
   EmptyFields : record { msg : text };
   NotFound : record { msg : text };
@@ -30,5 +39,5 @@ service : {
   add_course : (CoursePayLoad) -> (Result);
   delete_course : (nat64) -> (Result);
   get_course : (nat64) -> (Result) query;
-  update_course : (nat64, CoursePayLoad) -> (Result);
+  update_course : (nat64, CourseUpdatePayLoad) -> (Result);
 }

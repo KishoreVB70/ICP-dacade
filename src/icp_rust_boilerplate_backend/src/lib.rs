@@ -73,8 +73,34 @@ struct CoursePayLoad {
     attachment_url: String,
     keyword: String,
     category: String,
-    contact: String
+    contact: String,
 }
+
+#[derive(candid::CandidType, Serialize, Deserialize, Default)]
+struct CourseUpdatePayLoad {
+    title: Option<String>,
+    creator_name: Option<String>,
+    body: Option<String>,
+    attachment_url: Option<String>,
+    keyword: Option<String>,
+    category: Option<String>,
+    contact: Option<String>,
+}
+
+
+// #[ic_cdk::query]
+// fn get_courses_for_creator(creator_address: &str) -> Vec<Course> {
+//     let courses_map = STORAGE.with(|service| service.borrow());
+
+//     let mut courses_for_creator = Vec::new();
+//     for (_, course) in courses_map.iter() {
+//         if course.creator_address == creator_address {
+//             courses_for_creator.push(course.clone());
+//         }
+//     }
+//     courses_for_creator
+// }
+
 
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
@@ -86,13 +112,9 @@ fn get_course(id: u64) -> Result<Course, Error> {
     }
 }
 
-// // Function to filter courses by creator address
-// fn find_courses_by_creator_address(creator_address: &str) -> Vec<&Course> {
-//     courses
-//         .iter()
-//         .filter(|course| course.creator_address == creator_address)
-//         .collect()
-// }
+fn _get_course_(id: &u64) -> Option<Course> {
+    STORAGE.with(|service| service.borrow().get(id))
+}
 
 #[ic_cdk::update]
 fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
@@ -136,20 +158,7 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
 }
 
 #[ic_cdk::update]
-fn update_course(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
-    // //Validation Logic
-    // if payload.title.is_empty()
-    // || payload.creator_name.is_empty()
-    // || payload.body.is_empty()
-    // || payload.attachment_url.is_empty()
-    // || payload.keyword.is_empty()
-    // || payload.category.is_empty()
-    // || payload.contact.is_empty()
-    // {
-    //     return Err(Error::EmptyFields {
-    //         msg: "Please fill in all the required fields to create a course".to_string(),
-    //     });
-    // }
+fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut course) => {
             let caller = api::caller();
@@ -161,13 +170,27 @@ fn update_course(id: u64, payload: CoursePayLoad) -> Result<Course, Error> {
                     ),
                 })
             } else {
-                course.title = payload.title;
-                course.creator_name = payload.creator_name;
-                course.body = payload.body;
-                course.attachment_url = payload.attachment_url;
-                course.keyword = payload.keyword;
-                course.category = payload.category;
-                course.contact = payload.contact;
+                if let Some(title) = payload.title {
+                    course.title = title;
+                }
+                if let Some(creator_name) = payload.creator_name {
+                    course.creator_name = creator_name;
+                }
+                if let Some(body) = payload.body {
+                    course.body = body;
+                }
+                if let Some(attachment_url) = payload.attachment_url {
+                    course.attachment_url = attachment_url;
+                }
+                if let Some(keyword) = payload.keyword {
+                    course.keyword = keyword;
+                }
+                if let Some(category) = payload.category {
+                    course.category = category;
+                }
+                if let Some(contact) = payload.contact {
+                    course.contact = contact;
+                }
                 course.updated_at = Some(time());
                 do_insert(&course);
                 Ok(course)
@@ -204,7 +227,6 @@ fn delete_course(id: u64) -> Result<Course, Error> {
                 Ok(course)
             }
         }
-
         None => Err(Error::NotFound {
             msg: format!(
                 "couldn't delete course with id={}. course not found.",
@@ -219,10 +241,6 @@ enum Error {
     NotFound { msg: String },
     UnAuthorized { msg: String },
     EmptyFields {msg: String}
-}
-
-fn _get_course_(id: &u64) -> Option<Course> {
-    STORAGE.with(|service| service.borrow().get(id))
 }
 
 // need this to generate candid
