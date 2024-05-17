@@ -440,53 +440,54 @@ fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error>
 
 #[ic_cdk::update]
 fn delete_course(id: u64) -> Result<Course, Error> {
-    let caller = api::caller().to_string();
-    let is_allowed = {
-        let course = STORAGE.with(|service| service.borrow().get(&id));
-        if let Some(course) = course {
-            // Check if the caller is the creator of the course
-            if course.creator_address == caller.to_string() {
-                true
-            } else {
-                // Check if the caller is the admin
-                let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-                    admin_address.lock().unwrap().clone()
-                });
-                if let Some(admin) = &admin_address {
-                    if caller == *admin {
+    match STORAGE.with(|service| service.borrow().get(&id)) {
+        Some(course) => {
+            let caller = api::caller().to_string();
+            let is_allowed = {
+                let course = STORAGE.with(|service| service.borrow().get(&id));
+                if let Some(course) = course {
+                    // Check if the caller is the creator of the course
+                    if course.creator_address == caller.to_string() {
                         true
                     } else {
-                        // Check if the caller is one of the moderators
-                        let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                            moderator_addresses.lock().unwrap().clone()
+                        // Check if the caller is the admin
+                        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+                            admin_address.lock().unwrap().clone()
                         });
-                        moderators.contains(&caller.to_string())
+                        if let Some(admin) = &admin_address {
+                            if caller == *admin {
+                                true
+                            } else {
+                                // Check if the caller is one of the moderators
+                                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                                    moderator_addresses.lock().unwrap().clone()
+                                });
+                                moderators.contains(&caller.to_string())
+                            }
+                        } else {
+                            false
+                        }
                     }
                 } else {
                     false
                 }
-            }
-        } else {
-            false
-        }
-    };
-    if is_allowed {
-        match STORAGE.with(|service| service.borrow().get(&id)) {
-            Some(course) => {
+            };
+            if is_allowed {
                 STORAGE.with(|service| service.borrow_mut().remove(&id));
                 Ok(course)
+            } else {
+                Err(Error::UnAuthorized {
+                    msg: format!("You are not authorized to update course with id={}", id),
+                })
             }
-            None => Err(Error::NotFound {
-                msg: format!(
-                    "couldn't update a course with id={}. course not found",
-                    id
-                ),
-            }),
+
         }
-    } else {
-        Err(Error::UnAuthorized {
-            msg: format!("You are not authorized to update course with id={}", id),
-        })
+        None => Err(Error::NotFound {
+            msg: format!(
+                "couldn't update a course with id={}. course not found",
+                id
+            ),
+        }),
     }
 }
 
