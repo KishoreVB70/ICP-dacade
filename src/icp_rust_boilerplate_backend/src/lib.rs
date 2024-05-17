@@ -106,7 +106,7 @@ fn get_course(id: u64) -> Result<Course, Error> {
 
 
 #[ic_cdk::query]
-fn filter_courses(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
+fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     let courses: Vec<Course> = STORAGE.with(|storage| {
         storage.borrow().iter()
             .filter_map(|(_, course)| {
@@ -141,38 +141,21 @@ fn filter_courses(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
 }
 
 #[ic_cdk::query]
-fn get_courses_by_creator(creator_address: String) -> Result<Vec<Course>, Error> {
-    let courses: Vec<Course> = STORAGE.with(|storage| {
-        let storage = storage.borrow();
-        storage.iter()
-            .filter_map(|(_, course)| {
-                if course.creator_address == creator_address {
-                    Some(course.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    });
-
-    if courses.is_empty() {
-        Err(Error::NotFound{
-            msg: format!(
-                "couldn't find a course with creator address={}.",
-                creator_address
-            ),
-        })
-    } else {
-        Ok(courses)
-    }
-}
-
-#[ic_cdk::query]
-fn get_courses_by_category(category: String) -> Result<Vec<Course>, Error> {
+fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     let courses: Vec<Course> = STORAGE.with(|storage| {
         storage.borrow().iter()
-            .filter_map(|(_, course)| { 
-                if course.category == category {
+            .filter_map(|(_, course)| {
+                let mut matches = false; // Initialize with false for OR operation
+                if let Some(ref keyword) = payload.keyword {
+                    matches |= course.keyword == *keyword; 
+                }
+                if let Some(ref category) = payload.category {
+                    matches |= course.category == *category; 
+                }
+                if let Some(ref creator_address) = payload.creator_address {
+                    matches |= course.creator_address == *creator_address; 
+                }
+                if matches {
                     Some(course.clone())
                 } else {
                     None
@@ -183,16 +166,14 @@ fn get_courses_by_category(category: String) -> Result<Vec<Course>, Error> {
 
     if courses.is_empty() {
         Err(Error::NotFound{
-            msg: format!(
-                "couldn't find a course with category {}.",
-                category
+            msg: (
+                "couldn't find a course with provided inputs".to_string()
             ),
         })
     } else {
         Ok(courses)
     }
 }
-
 
 fn _get_course_(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
