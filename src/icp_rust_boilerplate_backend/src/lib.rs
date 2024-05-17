@@ -358,6 +358,10 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
 //         }),
 //     }
 // }
+// helper method to perform insert.
+fn do_insert(course: &Course) {
+    STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
+}
 
 #[ic_cdk::update]
 fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error> {
@@ -434,40 +438,60 @@ fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error>
     }
 }
 
-
-// helper method to perform insert.
-fn do_insert(course: &Course) {
-    STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
-}
-
 #[ic_cdk::update]
 fn delete_course(id: u64) -> Result<Course, Error> {
-    match STORAGE.with(|service| service.borrow().get(&id)) {
-        Some(course) => {
-            let caller = api::caller();
-            if course.creator_address != caller.to_string() {
-                Err(Error::UnAuthorized {
-                    msg: format!(
-                        "you are not the creator of the course id={}",
-                        id
-                    ),
-                })
+    let caller = api::caller().to_string();
+    let is_allowed = {
+        let course = STORAGE.with(|service| service.borrow().get(&id));
+        if let Some(course) = course {
+            // Check if the caller is the creator of the course
+            if course.creator_address == caller.to_string() {
+                true
             } else {
+                // Check if the caller is the admin
+                let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+                    admin_address.lock().unwrap().clone()
+                });
+                if let Some(admin) = &admin_address {
+                    if caller == *admin {
+                        true
+                    } else {
+                        // Check if the caller is one of the moderators
+                        let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                            moderator_addresses.lock().unwrap().clone()
+                        });
+                        moderators.contains(&caller.to_string())
+                    }
+                } else {
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    };
+    if is_allowed {
+        match STORAGE.with(|service| service.borrow().get(&id)) {
+            Some(course) => {
                 STORAGE.with(|service| service.borrow_mut().remove(&id));
                 Ok(course)
             }
+            None => Err(Error::NotFound {
+                msg: format!(
+                    "couldn't update a course with id={}. course not found",
+                    id
+                ),
+            }),
         }
-        None => Err(Error::NotFound {
-            msg: format!(
-                "couldn't delete course with id={}. course not found.",
-                id
-            ),
-        }),
+    } else {
+        Err(Error::UnAuthorized {
+            msg: format!("You are not authorized to update course with id={}", id),
+        })
     }
 }
 
 #[ic_cdk::update]
-fn delete_all_courses() -> Result<Vec<Course>, Error> {
+fn delete_my_courses() -> Result<Vec<Course>, Error> {
     let caller = api::caller().to_string(); // Convert caller address to string
     let mut deleted_courses: Vec<Course> = Vec::new(); // Keep track of deleted courses
 
