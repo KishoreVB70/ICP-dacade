@@ -30,6 +30,7 @@ type CourseUpdatePayLoad = record {
   attachment_url : opt text;
 };
 type Error = variant {
+  BannedUser : record { msg : text };
   EmptyFields : record { msg : text };
   NotFound : record { msg : text };
   UnAuthorized : record { msg : text };

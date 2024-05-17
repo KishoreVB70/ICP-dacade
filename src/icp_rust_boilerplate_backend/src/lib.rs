@@ -252,45 +252,55 @@ fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     }
 }
 
+// Could be better
 #[ic_cdk::update]
 fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
-    //Validation Logic
-    if course.title.is_empty()
-    || course.creator_name.is_empty()
-    || course.body.is_empty()
-    || course.attachment_url.is_empty()
-    || course.keyword.is_empty()
-    || course.category.is_empty()
-    || course.contact.is_empty()
-    {
-        return Err(Error::EmptyFields {
-            msg: "Please fill in all the required fields to create a course".to_string(),
-        });
-    }
-    let id = ID_COUNTER
-        .with(|counter| {
-            let current_value = *counter.borrow().get();
-            counter.borrow_mut().set(current_value + 1)
-        })
-        .expect("cannot increment id counter");
-
     let address_string: String = api::caller().to_string();
-    let course = Course {
-        id,
-        creator_address: address_string,
-        creator_name: course.creator_name,
-        title: course.title,
-        body: course.body,
-        attachment_url: course.attachment_url,
-        created_at: time(),
-        updated_at: None,
-        category: course.category,
-        keyword: course.keyword,
-        contact: course.contact
-    };
-
-    do_insert(&course);
-    Ok(course)
+    // Check whether the user is banned
+    BANNED_ADDRESSES.with(|banned_addresses| {
+        let addresses = banned_addresses.lock().unwrap();
+        if addresses.contains(&address_string) {
+            return Err(Error::BannedUser {
+                msg: "User is banned. Cannot add course".to_string(),
+            });
+        } else {
+            //Validation Logic
+            if course.title.is_empty()
+            || course.creator_name.is_empty()
+            || course.body.is_empty()
+            || course.attachment_url.is_empty()
+            || course.keyword.is_empty()
+            || course.category.is_empty()
+            || course.contact.is_empty()
+            {
+                return Err(Error::EmptyFields {
+                    msg: "Please fill in all the required fields to create a course".to_string(),
+                });
+            }
+            let id = ID_COUNTER
+                .with(|counter| {
+                    let current_value = *counter.borrow().get();
+                    counter.borrow_mut().set(current_value + 1)
+                })
+                .expect("cannot increment id counter");
+        
+            let course = Course {
+                id,
+                creator_address: address_string,
+                creator_name: course.creator_name,
+                title: course.title,
+                body: course.body,
+                attachment_url: course.attachment_url,
+                created_at: time(),
+                updated_at: None,
+                category: course.category,
+                keyword: course.keyword,
+                contact: course.contact
+            };
+            do_insert(&course);
+            Ok(course)
+        }
+    })
 }
 
 // internal method to perform insert.
@@ -590,7 +600,8 @@ fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
 enum Error {
     NotFound { msg: String },
     UnAuthorized { msg: String },
-    EmptyFields {msg: String}
+    EmptyFields {msg: String},
+    BannedUser {msg: String}
 }
 
 // need this to generate candid
