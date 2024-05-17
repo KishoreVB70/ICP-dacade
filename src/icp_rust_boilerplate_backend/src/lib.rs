@@ -87,20 +87,12 @@ struct CourseUpdatePayLoad {
     contact: Option<String>,
 }
 
-
-// #[ic_cdk::query]
-// fn get_courses_for_creator(creator_address: &str) -> Vec<Course> {
-//     let courses_map = STORAGE.with(|service| service.borrow());
-
-//     let mut courses_for_creator = Vec::new();
-//     for (_, course) in courses_map.iter() {
-//         if course.creator_address == creator_address {
-//             courses_for_creator.push(course.clone());
-//         }
-//     }
-//     courses_for_creator
-// }
-
+#[derive(candid::CandidType, Serialize, Deserialize, Default)]
+struct FilterPayLoad {
+    keyword: Option<String>,
+    category: Option<String>,
+    creator_address: Option<String>,
+}
 
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
@@ -109,6 +101,42 @@ fn get_course(id: u64) -> Result<Course, Error> {
         None => Err(Error::NotFound {
             msg: format!("a course with id={} not found", id),
         }),
+    }
+}
+
+
+#[ic_cdk::query]
+fn filter_courses(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
+    let courses: Vec<Course> = STORAGE.with(|storage| {
+        storage.borrow().iter()
+            .filter_map(|(_, course)| {
+                let mut matches = true;
+                if let Some(ref keyword) = payload.keyword {
+                    matches &= course.keyword == *keyword;
+                }
+                if let Some(ref category) = payload.category {
+                    matches &= course.category == *category;
+                }
+                if let Some(ref creator_address) = payload.creator_address {
+                    matches &= course.creator_address == *creator_address;
+                }
+                if matches {
+                    Some(course.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
+
+    if courses.is_empty() {
+        Err(Error::NotFound{
+            msg: (
+                "couldn't find a course with provided inputs".to_string()
+            ),
+        })
+    } else {
+        Ok(courses)
     }
 }
 
@@ -126,12 +154,38 @@ fn get_courses_by_creator(creator_address: String) -> Result<Vec<Course>, Error>
             })
             .collect()
     });
-    
+
     if courses.is_empty() {
         Err(Error::NotFound{
             msg: format!(
                 "couldn't find a course with creator address={}.",
                 creator_address
+            ),
+        })
+    } else {
+        Ok(courses)
+    }
+}
+
+#[ic_cdk::query]
+fn get_courses_by_category(category: String) -> Result<Vec<Course>, Error> {
+    let courses: Vec<Course> = STORAGE.with(|storage| {
+        storage.borrow().iter()
+            .filter_map(|(_, course)| { 
+                if course.category == category {
+                    Some(course.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
+
+    if courses.is_empty() {
+        Err(Error::NotFound{
+            msg: format!(
+                "couldn't find a course with category {}.",
+                category
             ),
         })
     } else {

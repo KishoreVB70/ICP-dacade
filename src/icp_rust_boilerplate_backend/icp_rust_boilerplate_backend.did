@@ -34,12 +34,19 @@ type Error = variant {
   NotFound : record { msg : text };
   UnAuthorized : record { msg : text };
 };
+type FilterPayLoad = record {
+  creator_address : opt text;
+  category : opt text;
+  keyword : opt text;
+};
 type Result = variant { Ok : Course; Err : Error };
 type Result_1 = variant { Ok : vec Course; Err : Error };
 service : {
   add_course : (CoursePayLoad) -> (Result);
   delete_course : (nat64) -> (Result);
+  filter_courses : (FilterPayLoad) -> (Result_1) query;
   get_course : (nat64) -> (Result) query;
+  get_courses_by_category : (text) -> (Result_1) query;
   get_courses_by_creator : (text) -> (Result_1) query;
   update_course : (nat64, CourseUpdatePayLoad) -> (Result);
 }
