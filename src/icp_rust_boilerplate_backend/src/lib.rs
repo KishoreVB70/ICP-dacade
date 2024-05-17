@@ -2,6 +2,7 @@
 extern crate serde;
 use candid::{Decode, Encode};
 use ic_cdk::api::time;
+use std::sync::Mutex;
 use ic_cdk::api;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{BoundedStorable, Cell, DefaultMemoryImpl, StableBTreeMap, Storable};
@@ -9,6 +10,11 @@ use std::{borrow::Cow, cell::RefCell};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
+
+// use ic_cdk::api::wallet;
+// use ic_cdk::export::candid::{CandidType, Principal};
+// use ic_cdk::storage;
+
 
 
 enum Category {
@@ -63,6 +69,9 @@ thread_local! {
         RefCell::new(StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
     ));
+
+    static ADMIN_ADDRESS: Mutex<Option<String>> = Mutex::new(None);
+    static MODERATOR_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
@@ -93,6 +102,42 @@ struct FilterPayLoad {
     category: Option<String>,
     creator_address: Option<String>,
 }
+
+#[ic_cdk::update]
+fn set_admin_address(address: String) {
+    ADMIN_ADDRESS.with(|admin_address| {
+        *admin_address.lock().unwrap() = Some(address);
+    });
+}
+
+
+#[ic_cdk::update]
+fn add_moderator_address(address: String) -> Result<(), String> {
+    ADMIN_ADDRESS.with(|admin_address| {
+        if let Some(admin) = &*admin_address.lock().unwrap() {
+            let caller = api::caller().to_string();
+            if caller == *admin {
+                MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                    moderator_addresses.lock().unwrap().push(address);
+                });
+                Ok(())
+            } else {
+                Err("Only admin can add moderators".to_string())
+            }
+        } else {
+            Err("Admin address is not set".to_string())
+        }
+    })
+}
+
+
+
+// #[derive(candid::CandidType, Serialize, Deserialize, Default)]
+// struct DonationPayload {
+//     amount: u64,
+//     recipient: Principal, 
+// }
+
 
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
@@ -332,6 +377,29 @@ fn delete_all_courses() -> Result<Vec<Course>, Error> {
         Ok(deleted_courses)
     }
 }
+
+// // Function to donate ICP tokens
+// pub fn donate_icp(payload: DonationPayload) -> Result<(), String> {
+//     // Get the authenticated user's wallet address
+//     let caller = wallet::get_sender();
+//     let sender_wallet = caller.expect("Failed to get sender wallet");
+
+//     // Check if the user has sufficient balance
+//     let sender_balance = wallet::balance(sender_wallet)
+//         .map_err(|err| format!("Failed to get sender balance: {:?}", err))?;
+//     if sender_balance < payload.amount {
+//         return Err("Insufficient balance".to_string());
+//     }
+
+//     // Transfer ICP tokens to the recipient
+//     let transfer_result = wallet::transfer_to_account(payload.recipient, payload.amount);
+//     if let Err(err) = transfer_result {
+//         return Err(format!("Failed to transfer ICP: {:?}", err));
+//     }
+
+//     Ok(())
+// }
+
 
 
 #[derive(candid::CandidType, Deserialize, Serialize)]
