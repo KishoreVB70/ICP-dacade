@@ -66,6 +66,7 @@ thread_local! {
 
     static ADMIN_ADDRESS: Mutex<Option<String>> = Mutex::new(None);
     static MODERATOR_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static BANNED_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
@@ -513,6 +514,75 @@ fn delete_my_courses() -> Result<Vec<Course>, Error> {
         })
     } else {
         Ok(deleted_courses)
+    }
+}
+
+#[ic_cdk::update]
+fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
+    // The caller must be admin or moderator
+    let caller = api::caller().to_string(); // Convert caller address to string
+    // Check if the caller is an admin or moderator and the provided address is not the admin or moderator
+    let is_authorized = {
+        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+            admin_address.lock().unwrap().clone()
+        });
+        if let Some(admin) = &admin_address {
+            if caller == *admin {
+                true
+            } else {
+                // Check if the caller is one of the moderators
+                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                    moderator_addresses.lock().unwrap().clone()
+                });
+                moderators.contains(&caller.to_string())
+            }
+        } else {
+            false
+        }
+    };
+
+    let is_allowed = {
+        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+            admin_address.lock().unwrap().clone()
+        });
+        if let Some(admin) = &admin_address{
+            if address == *admin{
+                false
+            } else {
+                // Check if the caller is one of the moderators
+                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                    moderator_addresses.lock().unwrap().clone()
+                });
+                if moderators.contains(&address.to_string()) {
+                    false
+                } else {
+                    true
+                }
+            }
+        } else {
+            false
+        }
+    };
+
+    if is_allowed && is_authorized {
+        // Delete all the courses
+        match delete_courses_by_creator(address.clone()){
+            Ok(course) => {
+                //Add the address to banned list
+                BANNED_ADDRESSES.with(|banned_addresses| {
+                    let mut addresses = banned_addresses.lock().unwrap();
+                    addresses.push(address);
+                });
+                Ok(course)
+            }
+            Err(_) => Err(Error::NotFound {
+                msg: ("No courses found for the address, cannot ban the user".to_string()),
+            }),
+        }
+    } else {
+        Err(Error::UnAuthorized {
+            msg: ("You are not authorized to ban the user".to_string()),
+        })
     }
 }
 
