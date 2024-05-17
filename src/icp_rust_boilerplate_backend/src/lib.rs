@@ -112,6 +112,34 @@ fn get_course(id: u64) -> Result<Course, Error> {
     }
 }
 
+#[ic_cdk::query]
+fn get_courses_by_creator(creator_address: String) -> Result<Vec<Course>, Error> {
+    let courses: Vec<Course> = STORAGE.with(|storage| {
+        let storage = storage.borrow();
+        storage.iter()
+            .filter_map(|(_, course)| {
+                if course.creator_address == creator_address {
+                    Some(course.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
+    
+    if courses.is_empty() {
+        Err(Error::NotFound{
+            msg: format!(
+                "couldn't find a course with creator address={}.",
+                creator_address
+            ),
+        })
+    } else {
+        Ok(courses)
+    }
+}
+
+
 fn _get_course_(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
 }

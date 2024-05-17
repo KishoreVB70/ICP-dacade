@@ -35,9 +35,11 @@ type Error = variant {
   UnAuthorized : record { msg : text };
 };
 type Result = variant { Ok : Course; Err : Error };
+type Result_1 = variant { Ok : vec Course; Err : Error };
 service : {
   add_course : (CoursePayLoad) -> (Result);
   delete_course : (nat64) -> (Result);
   get_course : (nat64) -> (Result) query;
+  get_courses_by_creator : (text) -> (Result_1) query;
   update_course : (nat64, CourseUpdatePayLoad) -> (Result);
 }
