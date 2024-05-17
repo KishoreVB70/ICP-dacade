@@ -11,12 +11,6 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
-// use ic_cdk::api::wallet;
-// use ic_cdk::export::candid::{CandidType, Principal};
-// use ic_cdk::storage;
-
-
-
 enum Category {
     Programming,
     Health,
@@ -172,18 +166,6 @@ fn add_moderator_address(address: String) -> Result<(), String> {
     result
 }
 
-
-
-
-
-
-// #[derive(candid::CandidType, Serialize, Deserialize, Default)]
-// struct DonationPayload {
-//     amount: u64,
-//     recipient: Principal, 
-// }
-
-
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
     match _get_course_(&id) {
@@ -269,7 +251,6 @@ fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     }
 }
 
-
 #[ic_cdk::update]
 fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
     //Validation Logic
@@ -311,94 +292,46 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
     Ok(course)
 }
 
-// #[ic_cdk::update]
-// fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error> {
-//     match STORAGE.with(|service| service.borrow().get(&id)) {
-//         Some(mut course) => {
-//             let caller = api::caller();
-//             if course.creator_address != caller.to_string() {
-//                 Err(Error::UnAuthorized {
-//                     msg: format!(
-//                         "you are not the creator of id={}",
-//                         id
-//                     ),
-//                 })
-//             } else {
-//                 if let Some(title) = payload.title {
-//                     course.title = title;
-//                 }
-//                 if let Some(creator_name) = payload.creator_name {
-//                     course.creator_name = creator_name;
-//                 }
-//                 if let Some(body) = payload.body {
-//                     course.body = body;
-//                 }
-//                 if let Some(attachment_url) = payload.attachment_url {
-//                     course.attachment_url = attachment_url;
-//                 }
-//                 if let Some(keyword) = payload.keyword {
-//                     course.keyword = keyword;
-//                 }
-//                 if let Some(category) = payload.category {
-//                     course.category = category;
-//                 }
-//                 if let Some(contact) = payload.contact {
-//                     course.contact = contact;
-//                 }
-//                 course.updated_at = Some(time());
-//                 do_insert(&course);
-//                 Ok(course)
-//             }
-//         }
-//         None => Err(Error::NotFound {
-//             msg: format!(
-//                 "couldn't update a course with id={}. course not found",
-//                 id
-//             ),
-//         }),
-//     }
-// }
-// helper method to perform insert.
+// internal method to perform insert.
 fn do_insert(course: &Course) {
     STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
 }
 
 #[ic_cdk::update]
 fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error> {
-    let caller = api::caller().to_string();
-    let is_allowed = {
-        let course = STORAGE.with(|service| service.borrow().get(&id));
-        if let Some(course) = course {
-            // Check if the caller is the creator of the course
-            if course.creator_address == caller.to_string() {
-                true
-            } else {
-                // Check if the caller is the admin
-                let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-                    admin_address.lock().unwrap().clone()
-                });
-                if let Some(admin) = &admin_address {
-                    if caller == *admin {
+    match STORAGE.with(|service| service.borrow().get(&id)) {
+        Some(mut course) => {
+            let caller = api::caller().to_string();
+            let is_allowed = {
+                let course = STORAGE.with(|service| service.borrow().get(&id));
+                if let Some(course) = course {
+                    // Check if the caller is the creator of the course
+                    if course.creator_address == caller.to_string() {
                         true
                     } else {
-                        // Check if the caller is one of the moderators
-                        let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                            moderator_addresses.lock().unwrap().clone()
+                        // Check if the caller is the admin
+                        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+                            admin_address.lock().unwrap().clone()
                         });
-                        moderators.contains(&caller.to_string())
+                        if let Some(admin) = &admin_address {
+                            if caller == *admin {
+                                true
+                            } else {
+                                // Check if the caller is one of the moderators
+                                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                                    moderator_addresses.lock().unwrap().clone()
+                                });
+                                moderators.contains(&caller.to_string())
+                            }
+                        } else {
+                            false
+                        }
                     }
                 } else {
                     false
                 }
-            }
-        } else {
-            false
-        }
-    };
-
-    if is_allowed {
-        match STORAGE.with(|service| service.borrow().get(&id)) {
-            Some(mut course) => {
+            };
+            if is_allowed {
                 if let Some(title) = payload.title {
                     course.title = title;
                 }
@@ -423,18 +356,18 @@ fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error>
                 course.updated_at = Some(time());
                 do_insert(&course);
                 Ok(course)
+            }else {
+                Err(Error::UnAuthorized {
+                    msg: format!("You are not authorized to update course with id={}", id),
+                })
             }
-            None => Err(Error::NotFound {
-                msg: format!(
-                    "couldn't update a course with id={}. course not found",
-                    id
-                ),
-            }),
         }
-    } else {
-        Err(Error::UnAuthorized {
-            msg: format!("You are not authorized to update course with id={}", id),
-        })
+        None => Err(Error::NotFound {
+            msg: format!(
+                "couldn't update a course with id={}. course not found",
+                id
+            ),
+        }),
     }
 }
 
@@ -523,30 +456,6 @@ fn delete_my_courses() -> Result<Vec<Course>, Error> {
         Ok(deleted_courses)
     }
 }
-
-// // Function to donate ICP tokens
-// pub fn donate_icp(payload: DonationPayload) -> Result<(), String> {
-//     // Get the authenticated user's wallet address
-//     let caller = wallet::get_sender();
-//     let sender_wallet = caller.expect("Failed to get sender wallet");
-
-//     // Check if the user has sufficient balance
-//     let sender_balance = wallet::balance(sender_wallet)
-//         .map_err(|err| format!("Failed to get sender balance: {:?}", err))?;
-//     if sender_balance < payload.amount {
-//         return Err("Insufficient balance".to_string());
-//     }
-
-//     // Transfer ICP tokens to the recipient
-//     let transfer_result = wallet::transfer_to_account(payload.recipient, payload.amount);
-//     if let Err(err) = transfer_result {
-//         return Err(format!("Failed to transfer ICP: {:?}", err));
-//     }
-
-//     Ok(())
-// }
-
-
 
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
