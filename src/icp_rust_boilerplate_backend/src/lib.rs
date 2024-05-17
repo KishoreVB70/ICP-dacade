@@ -146,7 +146,7 @@ fn add_moderator_address(address: String) -> Result<(), String> {
         let mut addresses = moderator_addresses.lock().unwrap();
         
         // Check if the maximum number of moderators is reached
-        if addresses.len() >= 4 {
+        if addresses.len() >= 5 {
             return Err("Maximum number of moderators reached".to_string());
         }
 
