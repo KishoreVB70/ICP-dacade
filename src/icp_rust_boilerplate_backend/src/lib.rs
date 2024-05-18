@@ -168,6 +168,49 @@ fn add_moderator(address: String) -> Result<(), String> {
     result
 }
 
+#[ic_cdk::update]
+fn remove_moderator(address: String) -> Result<(), Error> {
+    // Get the caller's principal
+    let caller = api::caller().to_string();
+
+    // Check if the caller is admin
+    let is_admin: bool = _is_admin(caller);
+
+    if is_admin {
+        MODERATOR_ADDRESSES.with(|moderator_addresses| {
+            let mut addresses = moderator_addresses.lock().unwrap();
+            // Check if the moderator address exists
+            if addresses.contains(&address) {
+                addresses.retain(|a| a != &address);
+                Ok(())
+            } else {
+                Err(Error::NotFound {
+                    msg: ("Provided addres is not a moderator".to_string())
+                })
+            }
+        })
+    } else {
+        Err(Error::UnAuthorized {
+            msg: ("only admin can remove moderators".to_string())
+        })
+    }
+}
+
+fn _is_admin(address: String) -> bool {
+    let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+        admin_address.lock().unwrap().clone()
+    });
+
+    if let Some(admin) = &admin_address {
+        if address == *admin {
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+}
 
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
@@ -177,11 +220,6 @@ fn get_course(id: u64) -> Result<Course, Error> {
             msg: format!("a course with id={} not found", id),
         }),
     }
-}
-
-// Internal function
-fn _get_course_(id: &u64) -> Option<Course> {
-    STORAGE.with(|service| service.borrow().get(id))
 }
 
 // Have to fix this to not show anything if there is no match
@@ -304,11 +342,6 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
             Ok(course)
         }
     })
-}
-
-// internal method to perform insert.
-fn do_insert(course: &Course) {
-    STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
 }
 
 #[ic_cdk::update]
@@ -534,7 +567,7 @@ fn delete_my_courses() -> Result<Vec<Course>, Error> {
 fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     // The caller must be admin or moderator
     let caller = api::caller().to_string(); // Convert caller address to string
-    
+
     // Check if the caller is an admin or moderator
     let is_authorized: bool = _is_authorized(caller);
 
@@ -609,6 +642,18 @@ fn un_ban_creator(address: String) -> Result<(), Error> {
             msg: ("You are not authorized to ban the user".to_string()),
         })
     }
+}
+
+// Internal functions
+
+//Obtain the course from storage
+fn _get_course_(id: &u64) -> Option<Course> {
+    STORAGE.with(|service| service.borrow().get(id))
+}
+
+// Add the course into the storage
+fn do_insert(course: &Course) {
+    STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
 }
 
 // Checks if the caller is either the admin or a moderator
