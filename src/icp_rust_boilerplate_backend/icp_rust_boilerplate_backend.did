@@ -55,7 +55,7 @@ service : {
   filter_courses_or : (FilterPayLoad) -> (Result_2) query;
   get_course : (nat64) -> (Result) query;
   remove_moderator : (text) -> (Result_3);
-  set_admin_address : (text) -> (Result_1);
+  set_admin_address : (text) -> (Result_3);
   un_ban_creator : (text) -> (Result_3);
   update_course : (nat64, CourseUpdatePayLoad) -> (Result);
 }

@@ -99,7 +99,7 @@ struct FilterPayLoad {
 // If the admin is not already set, the input would be the admin,
 // If the admin is initialized, then only the current admin can change the admin
 #[ic_cdk::update]
-fn set_admin_address(address: String) -> Result<(), String> {
+fn set_admin_address(address: String) -> Result<(), Error> {
     let caller: String = api::caller().to_string();
     ADMIN_ADDRESS.with(|admin_address| {
         let mut admin = admin_address.lock().unwrap();
@@ -109,7 +109,9 @@ fn set_admin_address(address: String) -> Result<(), String> {
             *admin = Some(address);
             Ok(())
         } else {
-            Err("Only admin can change".to_string())
+            Err(Error:: UnAuthorized {
+                msg: ("Only admin can change".to_string())
+            })
         }
     })
 }
@@ -582,7 +584,7 @@ fn un_ban_creator(address: String) -> Result<(), Error> {
     }
 }
 
-// Internal functions
+// Internal helper functions
 
 //Retreive the course from storage
 fn _get_course_(id: &u64) -> Option<Course> {
@@ -658,6 +660,7 @@ fn _is_allowed(id: u64, caller: String) -> bool {
     }
 }
 
+// Error types
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
     NotFound { msg: String },
