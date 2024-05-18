@@ -59,8 +59,13 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
     ));
 
+    // Stores a single admin address
     static ADMIN_ADDRESS: Mutex<Option<String>> = Mutex::new(None);
+
+    // Stores the moderator addresses
     static MODERATOR_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    // Satores teh addresses of banned users
     static BANNED_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
@@ -96,7 +101,8 @@ struct FilterPayLoad {
     creator_address: Option<String>,
 }
 
-// If the admin is not already set, the input would be the admin,
+// Function to set the admin
+// If the admin is not already set, the address input is set the admin,
 // If the admin is initialized, then only the current admin can change the admin
 #[ic_cdk::update]
 fn set_admin_address(address: String) -> Result<(), Error> {
@@ -234,7 +240,7 @@ fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
 }
 
 // Filters courses based on the provided criteria (OR condition).
-// The AND condition is such that it retreives the courses which satisfy any of the
+// The OR condition is such that it retreives the courses which satisfy any of the
 // criteria provided by the user
 #[ic_cdk::query]
 fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
