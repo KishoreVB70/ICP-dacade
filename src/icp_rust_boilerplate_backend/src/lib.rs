@@ -1,4 +1,4 @@
-#[macro_use]
+ #[macro_use]
 extern crate serde;
 use candid::{Decode, Encode};
 use ic_cdk::api::time;
@@ -11,11 +11,12 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
+
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Course {
     id: u64,
     creator_name: String,
-    creator_address: String,
+    creator_address: String, // Stores the principal of the caller in string format
     title: String,
     body: String,
     attachment_url: String,
@@ -63,6 +64,7 @@ thread_local! {
     static BANNED_ADDRESSES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
+//Payload to add a new course obtained from the user
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
 struct CoursePayLoad {
     title: String,
@@ -74,6 +76,7 @@ struct CoursePayLoad {
     contact: String,
 }
 
+//Payload to update a  course obtained from the user
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
 struct CourseUpdatePayLoad {
     title: Option<String>,
@@ -85,6 +88,7 @@ struct CourseUpdatePayLoad {
     contact: Option<String>,
 }
 
+// Payload to filter all the available courses
 #[derive(candid::CandidType, Serialize, Deserialize, Default)]
 struct FilterPayLoad {
     keyword: Option<String>,
@@ -92,7 +96,8 @@ struct FilterPayLoad {
     creator_address: Option<String>,
 }
 
-// Small confusion in what the admin address is not set is doing
+// If the admin is not already set, the input would be the admin,
+// If the admin is initialized, then only the current admin can change the admin
 #[ic_cdk::update]
 fn set_admin_address(address: String) -> Result<(), String> {
     let caller: String = api::caller().to_string();
@@ -109,6 +114,7 @@ fn set_admin_address(address: String) -> Result<(), String> {
     })
 }
 
+// Adds a moderator. Only the admin can add moderators.
 #[ic_cdk::update]
 fn add_moderator(address: String) -> Result<(), String> {
     // Get the caller's principal
@@ -140,6 +146,7 @@ fn add_moderator(address: String) -> Result<(), String> {
     }
 }
 
+// Removes a moderator. Only admin can remove moderators.
 #[ic_cdk::update]
 fn remove_moderator(address: String) -> Result<(), Error> {
     // Get the caller's principal
@@ -168,6 +175,7 @@ fn remove_moderator(address: String) -> Result<(), Error> {
     }
 }
 
+// Retrieves a course based on its ID.
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
     match _get_course_(&id) {
@@ -178,6 +186,9 @@ fn get_course(id: u64) -> Result<Course, Error> {
     }
 }
 
+// Filters courses based on the provided criteria (AND condition)
+// The AND condition is such that it retreives the courses which satisfy all the
+// criteria provided by the user
 #[ic_cdk::query]
 fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     // Check if the FilterPayLoad is empty
@@ -220,6 +231,9 @@ fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     }
 }
 
+// Filters courses based on the provided criteria (OR condition).
+// The AND condition is such that it retreives the courses which satisfy any of the
+// criteria provided by the user
 #[ic_cdk::query]
 fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     // Check if the FilterPayLoad is empty
@@ -261,7 +275,7 @@ fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     }
 }
 
-// Could be better
+// Adds a new course to the storage
 #[ic_cdk::update]
 fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
     let address_string: String = api::caller().to_string();
@@ -312,40 +326,13 @@ fn add_course(course: CoursePayLoad) -> Result<Course, Error> {
     })
 }
 
+// Updates an existing course. Only the creator or the admin or a moderator can update
 #[ic_cdk::update]
 fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(mut course) => {
             let caller = api::caller().to_string();
-            let is_allowed = {
-                let course = STORAGE.with(|service| service.borrow().get(&id));
-                if let Some(course) = course {
-                    // Check if the caller is the creator of the course
-                    if course.creator_address == caller.to_string() {
-                        true
-                    } else {
-                        // Check if the caller is the admin
-                        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-                            admin_address.lock().unwrap().clone()
-                        });
-                        if let Some(admin) = &admin_address {
-                            if caller == *admin {
-                                true
-                            } else {
-                                // Check if the caller is one of the moderators
-                                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                                    moderator_addresses.lock().unwrap().clone()
-                                });
-                                moderators.contains(&caller.to_string())
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            };
+            let is_allowed = _is_allowed(id, caller);
             if is_allowed {
                 if let Some(title) = payload.title {
                     course.title = title;
@@ -386,40 +373,17 @@ fn update_course(id: u64, payload: CourseUpdatePayLoad) -> Result<Course, Error>
     }
 }
 
+// Deletes a course based on the ID. Only the creator or the admin or a moderator can update
 #[ic_cdk::update]
 fn delete_course(id: u64) -> Result<Course, Error> {
     match STORAGE.with(|service| service.borrow().get(&id)) {
         Some(course) => {
             let caller = api::caller().to_string();
-            let is_allowed = {
-                let course = STORAGE.with(|service| service.borrow().get(&id));
-                if let Some(course) = course {
-                    // Check if the caller is the creator of the course
-                    if course.creator_address == caller.to_string() {
-                        true
-                    } else {
-                        // Check if the caller is the admin
-                        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-                            admin_address.lock().unwrap().clone()
-                        });
-                        if let Some(admin) = &admin_address {
-                            if caller == *admin {
-                                true
-                            } else {
-                                // Check if the caller is one of the moderators
-                                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                                    moderator_addresses.lock().unwrap().clone()
-                                });
-                                moderators.contains(&caller.to_string())
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            };
+
+            // Checks if the caller is either the creator, or the admin or a moderator
+            let is_allowed = _is_allowed(id, caller);
+
+            // Remove the course from storage
             if is_allowed {
                 STORAGE.with(|service| service.borrow_mut().remove(&id));
                 Ok(course)
@@ -428,7 +392,6 @@ fn delete_course(id: u64) -> Result<Course, Error> {
                     msg: format!("You are not authorized to update course with id={}", id),
                 })
             }
-
         }
         None => Err(Error::NotFound {
             msg: format!(
@@ -439,6 +402,7 @@ fn delete_course(id: u64) -> Result<Course, Error> {
     }
 }
 
+// Deletes all courses by a creator based on the address. Only the admin or a moderator can access
 #[ic_cdk::update]
 fn delete_courses_by_creator(address: String) -> Result<Vec<Course>, Error> {
     let caller = api::caller().to_string(); // Convert caller address to string
@@ -498,6 +462,7 @@ fn delete_courses_by_creator(address: String) -> Result<Vec<Course>, Error> {
     }
 }
 
+// Deletes all courses of the caller
 #[ic_cdk::update]
 fn delete_my_courses() -> Result<Vec<Course>, Error> {
     let caller = api::caller().to_string(); // Convert caller address to string
@@ -531,6 +496,9 @@ fn delete_my_courses() -> Result<Vec<Course>, Error> {
     }
 }
 
+// Bans a creator from adding courses.
+// Deletes all the courses by the creator
+// Only the admin or a moderator can access
 #[ic_cdk::update]
 fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     // The caller must be admin or moderator
@@ -585,6 +553,8 @@ fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     }
 }
 
+// Un ban a creator from adding courses
+// Only the admin or a moderator can access
 #[ic_cdk::update]
 fn un_ban_creator(address: String) -> Result<(), Error> {
     // The caller must be admin or moderator
@@ -614,7 +584,7 @@ fn un_ban_creator(address: String) -> Result<(), Error> {
 
 // Internal functions
 
-//Obtain the course from storage
+//Retreive the course from storage
 fn _get_course_(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
 }
@@ -658,6 +628,33 @@ fn _is_authorized(address: String) -> bool {
         }
     } else {
         false
+    }
+}
+
+// Checks if the caller is either the creator of the id, or the admin or a moderator
+fn _is_allowed(id: u64, caller: String) -> bool {
+    let course = STORAGE.with(|service| service.borrow().get(&id));
+    // Check if the caller is the creator of the course
+    if course.unwrap().creator_address == caller.to_string() {
+        true
+    } else {
+        // Check if the caller is the admin
+        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+            admin_address.lock().unwrap().clone()
+        });
+        if let Some(admin) = &admin_address {
+            if caller == *admin {
+                true
+            } else {
+                // Check if the caller is one of the moderators
+                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                    moderator_addresses.lock().unwrap().clone()
+                });
+                moderators.contains(&caller.to_string())
+            }
+        } else {
+            false
+        }
     }
 }
 
