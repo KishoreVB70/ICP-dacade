@@ -11,13 +11,6 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
-// Have to make this work
-enum Category {
-    Programming,
-    Health,
-    LifeStyle,
-}
-
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Course {
     id: u64,
@@ -102,21 +95,16 @@ struct FilterPayLoad {
 // Small confusion in what the admin address is not set is doing
 #[ic_cdk::update]
 fn set_admin_address(address: String) -> Result<(), String> {
+    let caller: String = api::caller().to_string();
     ADMIN_ADDRESS.with(|admin_address| {
-        let caller = api::caller().to_string();
-        let mut admin_address = admin_address.lock().unwrap();
-        if admin_address.is_none() {
-            *admin_address = Some(address);
+        let mut admin = admin_address.lock().unwrap();
+
+        // If admin address is not set, or the caller is the current admin
+        if admin.is_none() || admin.as_ref().unwrap() == &caller {
+            *admin = Some(address);
             Ok(())
-        } else if let Some(admin) = &*admin_address {
-            if caller == *admin {
-                *admin_address = Some(address);
-                Ok(())
-            } else {
-                Err("Only admin can change the admin address".to_string())
-            }
         } else {
-            Err("Admin address is not set".to_string())
+            Err("Only admin can change".to_string())
         }
     })
 }
@@ -189,7 +177,6 @@ fn get_course(id: u64) -> Result<Course, Error> {
         }),
     }
 }
-
 
 #[ic_cdk::query]
 fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
