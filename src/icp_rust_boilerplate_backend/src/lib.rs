@@ -127,45 +127,29 @@ fn add_moderator(address: String) -> Result<(), String> {
     let caller = api::caller().to_string();
 
     // Check if admin address is set and if caller is admin
-    let is_admin = {
-        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-            admin_address.lock().unwrap().clone()
-        });
+    let is_admin = _is_admin(caller);
 
-        if let Some(admin) = &admin_address {
-            if caller != *admin {
-                return Err("Only admin can add moderators".to_string());
+    if is_admin {
+        let result = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+            let mut addresses = moderator_addresses.lock().unwrap();
+            
+            // Check if the maximum number of moderators is reached
+            if addresses.len() >= 5 {
+                return Err("Maximum number of moderators reached".to_string())
             }
-            true
-        } else {
-            return Err("Admin address is not set".to_string());
-        }
-    };
+    
+            // Check if the moderator address already exists
+            if addresses.contains(&address) {
+                return Err("Moderator address already exists".to_string())
+            }
 
-    // Update moderator addresses
-    let result = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-        let mut addresses = moderator_addresses.lock().unwrap();
-        
-        // Check if the maximum number of moderators is reached
-        if addresses.len() >= 5 {
-            return Err("Maximum number of moderators reached".to_string());
-        }
-
-        // Check if the moderator address already exists
-        if addresses.contains(&address) {
-            return Err("Moderator address already exists".to_string());
-        }
-
-        // Add the moderator address
-        if is_admin {
             addresses.push(address);
             Ok(())
-        } else {
-            Err("Only admin can add moderators".to_string())
-        }
-    });
-
-    result
+        });
+        result
+    } else {
+        Err("Only admin can add moderators".to_string())
+    }
 }
 
 #[ic_cdk::update]
