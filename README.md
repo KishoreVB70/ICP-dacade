@@ -6,37 +6,36 @@ This project leverages the capabilities of the Internet Computer to provide a de
 ### Key Features
 
 1. **Course Management**
-   - **Add Course:** Users can add new courses with details like title, creator name, body, attachment URL, keyword, category, and contact information.
-   - **Update Course:** Only the creator, admin, or moderators can update a course's details.
-   - **Delete Course:** Courses can be deleted by the creator, admin, or moderators.
-   - **Delete My Courses:** Users can delete all their own courses.
-   - **Delete Courses by Creator:** Admins and moderators can delete all courses by a specific creator.
+  - **Add Course:** Users can add new courses with details like title, creator name, body, attachment URL, keyword, category, and contact information.
+  - **Update Course:** Only the creator, admin, or moderators can update a course's details.
+  - **Delete Course:** Courses can be deleted by the creator, admin, or moderators.
+  - **Delete My Courses:** Users can delete all their own courses.
+  - **Delete Courses by Creator:** Admins and moderators can delete all courses by a specific creator.
 
 2. **Course Filtering**
-    - AND based filtering provides the courses which match all of the criterias of the user
-    - OR based filtering provided courses whcih match any of the criterias fo the user
-   - **Filter Courses (AND Condition):** Retrieve courses that match all provided criteria (keyword, category, creator address).
-   - **Filter Courses (OR Condition):** Retrieve courses that match any of the provided criteria (keyword, category, creator address).
+  - AND based filtering provides the courses which match all of the criterias of the user
+  - OR based filtering provided courses whcih match any of the criterias fo the user
+  - **Filter Courses (AND Condition):** Retrieve courses that match all provided criteria (keyword, category, creator address).
+  - **Filter Courses (OR Condition):** Retrieve courses that match any of the provided criteria (keyword, category, creator address).
 
 3. **User Roles and Permissions**
   - To regulate ill actors, a moderation system is created based on admin access
-   - **Admin Management:** 
-     - Set or change the admin address.
-     - Admin has the highest level of permissions, mainly changing the admin and adding, removing moderators.
-   - **Moderator Management:** 
-     - Add and remove moderators.
-     - Moderators can manage courses(update, delete) and users(ban, unban) but have limited permissions compared to the admin.
-   - **Banned Users Management:** 
-     - Ban users from adding courses.
-     - Unban users.
-     - Banning a user also removes all their courses.
-
+  - **Admin Management:** 
+    - Set or change the admin address.
+    - Admin has the highest level of permissions, mainly changing the admin and adding, removing moderators.
+  - **Moderator Management:** 
+    - Add and remove moderators.
+    - Moderators can manage courses(update, delete) and users(ban, unban) but have limited permissions compared to the admin.
+  - **Banned Users Management:** 
+    - Ban users from adding courses.
+    - Unban users.
+    - Banning a user also removes all their courses.
 
 4. **Error Handling**
-   - **Not Found:** Returns an error if a course or user is not found.
-   - **Unauthorized Access:** Returns an error if a user tries to perform an action without the necessary permissions.
-   - **Empty Fields:** Returns an error if required fields are missing during course creation.
-   - **Banned User:** Returns an error if a banned user tries to add a course.
+  - **Not Found:** Returns an error if a course or user is not found.
+  - **Unauthorized Access:** Returns an error if a user tries to perform an action without the necessary permissions.
+  - **Empty Fields:** Returns an error if required fields are missing during course creation.
+  - **Banned User:** Returns an error if a banned user tries to add a course.
 
 ### Detailed Functionality
 
