@@ -180,22 +180,6 @@ fn remove_moderator(address: String) -> Result<(), Error> {
     }
 }
 
-fn _is_admin(address: String) -> bool {
-    let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-        admin_address.lock().unwrap().clone()
-    });
-
-    if let Some(admin) = &admin_address {
-        if address == *admin {
-            true
-        } else {
-            false
-        }
-    } else {
-        false
-    }
-}
-
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
     match _get_course_(&id) {
@@ -206,9 +190,16 @@ fn get_course(id: u64) -> Result<Course, Error> {
     }
 }
 
-// Have to fix this to not show anything if there is no match
+
 #[ic_cdk::query]
 fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
+    // Check if the FilterPayLoad is empty
+    if payload.keyword.is_none() && payload.category.is_none() && payload.creator_address.is_none() {
+        return Err(Error::NotFound {
+            msg: "Filter payload is empty; at least one filter criterion must be provided".to_string(),
+        });
+    }
+
     let courses: Vec<Course> = STORAGE.with(|storage| {
         storage.borrow().iter()
             .filter_map(|(_, course)| {
@@ -244,6 +235,12 @@ fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
 
 #[ic_cdk::query]
 fn filter_courses_or(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
+    // Check if the FilterPayLoad is empty
+    if payload.keyword.is_none() && payload.category.is_none() && payload.creator_address.is_none() {
+        return Err(Error::NotFound {
+            msg: "Filter payload is empty; at least one filter criterion must be provided".to_string(),
+        });
+    }
     let courses: Vec<Course> = STORAGE.with(|storage| {
         storage.borrow().iter()
             .filter_map(|(_, course)| {
@@ -638,6 +635,23 @@ fn _get_course_(id: &u64) -> Option<Course> {
 // Add the course into the storage
 fn do_insert(course: &Course) {
     STORAGE.with(|service| service.borrow_mut().insert(course.id, course.clone()));
+}
+
+// Checks if the address is the admin
+fn _is_admin(address: String) -> bool {
+    let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+        admin_address.lock().unwrap().clone()
+    });
+
+    if let Some(admin) = &admin_address {
+        if address == *admin {
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    }
 }
 
 // Checks if the caller is either the admin or a moderator
