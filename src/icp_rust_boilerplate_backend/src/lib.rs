@@ -11,6 +11,7 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
+// Have to make this work
 enum Category {
     Programming,
     Health,
@@ -121,7 +122,7 @@ fn set_admin_address(address: String) -> Result<(), String> {
 }
 
 #[ic_cdk::update]
-fn add_moderator_address(address: String) -> Result<(), String> {
+fn add_moderator(address: String) -> Result<(), String> {
     // Get the caller's principal
     let caller = api::caller().to_string();
 
@@ -167,6 +168,7 @@ fn add_moderator_address(address: String) -> Result<(), String> {
     result
 }
 
+
 #[ic_cdk::query]
 fn get_course(id: u64) -> Result<Course, Error> {
     match _get_course_(&id) {
@@ -182,6 +184,7 @@ fn _get_course_(id: &u64) -> Option<Course> {
     STORAGE.with(|service| service.borrow().get(id))
 }
 
+// Have to fix this to not show anything if there is no match
 #[ic_cdk::query]
 fn filter_courses_and(payload: FilterPayLoad) -> Result<Vec<Course>, Error> {
     let courses: Vec<Course> = STORAGE.with(|storage| {
@@ -531,26 +534,11 @@ fn delete_my_courses() -> Result<Vec<Course>, Error> {
 fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     // The caller must be admin or moderator
     let caller = api::caller().to_string(); // Convert caller address to string
-    // Check if the caller is an admin or moderator and the provided address is not the admin or moderator
-    let is_authorized = {
-        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-            admin_address.lock().unwrap().clone()
-        });
-        if let Some(admin) = &admin_address {
-            if caller == *admin {
-                true
-            } else {
-                // Check if the caller is one of the moderators
-                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                    moderator_addresses.lock().unwrap().clone()
-                });
-                moderators.contains(&caller.to_string())
-            }
-        } else {
-            false
-        }
-    };
+    
+    // Check if the caller is an admin or moderator
+    let is_authorized: bool = _is_authorized(caller);
 
+    // Checks if the the input address is admin or a moderator
     let is_allowed = {
         let admin_address = ADMIN_ADDRESS.with(|admin_address| {
             admin_address.lock().unwrap().clone()
@@ -575,7 +563,7 @@ fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
     };
 
     if is_allowed && is_authorized {
-        // Delete all the courses
+        // Delete all the courses of the user
         match delete_courses_by_creator(address.clone()){
             Ok(course) => {
                 //Add the address to banned list
@@ -600,25 +588,9 @@ fn ban_creator(address: String) -> Result<Vec<Course>, Error> {
 fn un_ban_creator(address: String) -> Result<(), Error> {
     // The caller must be admin or moderator
     let caller = api::caller().to_string(); // Convert caller address to string
-    // Check if the caller is an admin or moderator and the provided address is not the admin or moderator
-    let is_authorized = {
-        let admin_address = ADMIN_ADDRESS.with(|admin_address| {
-            admin_address.lock().unwrap().clone()
-        });
-        if let Some(admin) = &admin_address {
-            if caller == *admin {
-                true
-            } else {
-                // Check if the caller is one of the moderators
-                let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
-                    moderator_addresses.lock().unwrap().clone()
-                });
-                moderators.contains(&caller.to_string())
-            }
-        } else {
-            false
-        }
-    };
+
+    // cheks if the caller is the admin or a moderator
+    let is_authorized: bool = _is_authorized(caller);
 
     if is_authorized {
         BANNED_ADDRESSES.with(|banned_addresses| {
@@ -636,6 +608,26 @@ fn un_ban_creator(address: String) -> Result<(), Error> {
         Err(Error::UnAuthorized {
             msg: ("You are not authorized to ban the user".to_string()),
         })
+    }
+}
+
+// Checks if the caller is either the admin or a moderator
+fn _is_authorized(address: String) -> bool {
+    let admin_address = ADMIN_ADDRESS.with(|admin_address| {
+        admin_address.lock().unwrap().clone()
+    });
+    if let Some(admin) = &admin_address {
+        if address == *admin {
+            true
+        } else {
+            // Check if the caller is one of the moderators
+            let moderators = MODERATOR_ADDRESSES.with(|moderator_addresses| {
+                moderator_addresses.lock().unwrap().clone()
+            });
+            moderators.contains(&address.to_string())
+        }
+    } else {
+        false
     }
 }
 

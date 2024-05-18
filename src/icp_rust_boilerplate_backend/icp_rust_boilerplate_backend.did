@@ -46,7 +46,7 @@ type Result_2 = variant { Ok : vec Course; Err : Error };
 type Result_3 = variant { Ok; Err : Error };
 service : {
   add_course : (CoursePayLoad) -> (Result);
-  add_moderator_address : (text) -> (Result_1);
+  add_moderator : (text) -> (Result_1);
   ban_creator : (text) -> (Result_2);
   delete_course : (nat64) -> (Result);
   delete_courses_by_creator : (text) -> (Result_2);
