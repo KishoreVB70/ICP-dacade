@@ -11,7 +11,6 @@ use std::{borrow::Cow, cell::RefCell};
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
 
-
 #[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
 struct Course {
     id: u64,
