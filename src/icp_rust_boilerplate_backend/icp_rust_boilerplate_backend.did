@@ -29,33 +29,30 @@ type CourseUpdatePayLoad = record {
   keyword : opt text;
   attachment_url : opt text;
 };
-type Error = variant {
-  BannedUser : record { msg : text };
-  EmptyFields : record { msg : text };
-  NotFound : record { msg : text };
-  UnAuthorized : record { msg : text };
-};
 type FilterPayLoad = record {
   creator_address : opt text;
+  end_date : opt nat64;
+  start_date : opt nat64;
   category : opt text;
   keyword : opt text;
 };
-type Result = variant { Ok : Course; Err : Error };
+type Result = variant { Ok : Course; Err : text };
 type Result_1 = variant { Ok; Err : text };
-type Result_2 = variant { Ok : vec Course; Err : Error };
-type Result_3 = variant { Ok; Err : Error };
+type Result_2 = variant { Ok : vec Course; Err : text };
 service : {
   add_course : (CoursePayLoad) -> (Result);
   add_moderator : (text) -> (Result_1);
   ban_creator : (text) -> (Result_2);
+  count_courses : () -> (nat64) query;
   delete_course : (nat64) -> (Result);
   delete_courses_by_creator : (text) -> (Result_2);
   delete_my_courses : () -> (Result_2);
   filter_courses_and : (FilterPayLoad) -> (Result_2) query;
   filter_courses_or : (FilterPayLoad) -> (Result_2) query;
+  get_all_courses : () -> (vec Course) query;
   get_course : (nat64) -> (Result) query;
-  remove_moderator : (text) -> (Result_3);
-  set_admin_address : (text) -> (Result_3);
-  un_ban_creator : (text) -> (Result_3);
+  remove_moderator : (text) -> (Result_1);
+  set_admin_address : (text) -> (Result_1);
+  un_ban_creator : (text) -> (Result_1);
   update_course : (nat64, CourseUpdatePayLoad) -> (Result);
 }
